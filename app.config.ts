@@ -54,7 +54,6 @@ const expoConfig: ExpoConfig = {
     orkaApiKey: process.env.ORKA_API_KEY ?? "",
     orkaBaseUrl: process.env.ORKA_BASE_URL ?? "https://admin.orka.com.tr",
   },
-  extraBase64: [],
 };
 
 export default expoConfig;
