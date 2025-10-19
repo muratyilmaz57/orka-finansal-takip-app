@@ -10,7 +10,7 @@ type InvoiceType = "all" | "sales" | "purchase";
 
 export default function InvoicesScreen() {
   const [filter, setFilter] = useState<InvoiceType>("all");
-  const { data, isLoading, isRefetching, refetch } = useDocumentsQuery({ Page: 1, PageSize: 50 });
+  const { data, isLoading, isRefetching, refetch } = useDocumentsQuery({ Page: 1 });
 
   const invoices = useMemo(() => {
     const documents = data ?? [];
@@ -32,6 +32,11 @@ export default function InvoicesScreen() {
       >
         <Text style={styles.title}>E-Belgeler</Text>
         <Text style={styles.subtitle}>Son 10 Fatura</Text>
+        {!isLoading && data && (
+          <Text style={styles.debugText}>
+            Toplam {data.length} belge, gösterilen {invoices.length} fatura
+          </Text>
+        )}
 
         <View style={styles.filterRow}>
           {(["all", "sales", "purchase"] as InvoiceType[]).map((item) => (
@@ -136,6 +141,11 @@ const styles = StyleSheet.create({
   subtitle: {
     color: "#94A3B8",
     fontSize: 14,
+  },
+  debugText: {
+    color: "#64748B",
+    fontSize: 12,
+    fontStyle: "italic",
   },
   filterRow: {
     flexDirection: "row",
