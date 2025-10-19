@@ -24,6 +24,13 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="invoices"
+        options={{
+          title: 'E-Belgeler',
+          tabBarIcon: ({ color, size }) => <Ionicons name="receipt" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="transactions"
         options={{
           title: 'Ticari',
