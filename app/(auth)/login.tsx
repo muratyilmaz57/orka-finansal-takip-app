@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
-import { Alert, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity } from "react-native";
+import { SafeAreaView, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import Constants from "expo-constants";
 
 import { useAuth } from "@/context/AuthContext";
-import { colors } from "@/theme/colors";
+import { Button, Input } from "@/components/ui";
+import { ErrorState } from "@/components/ui/error-state";
+import { colors, spacing, fontSize } from "@/constants/theme";
 
 const DEFAULT_YEAR = 2025;
 
@@ -16,20 +18,22 @@ export default function LoginScreen() {
   );
   const [year, setYear] = useState<string>(String(DEFAULT_YEAR));
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleLogin = async () => {
-    if (!apiKey) {
-      Alert.alert("API anahtarı gerekli", "Lütfen ORKA API anahtarınızı girin.");
+    if (!apiKey.trim()) {
+      setError("Lütfen ORKA API anahtarınızı girin.");
       return;
     }
     const parsedYear = Number(year) || DEFAULT_YEAR;
     try {
+      setError(null);
       setLoading(true);
       await login({ apiKey, companyYear: parsedYear });
       router.replace("/(auth)/company");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Giriş başarısız oldu.";
-      Alert.alert("Giriş başarısız", message);
+      const message = error instanceof Error ? error.message : "Giriş başarısız oldu. Lütfen API anahtarınızı kontrol edin.";
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -45,31 +49,55 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>Orka Finansal Takip</Text>
-      <Text style={styles.subtitle}>API anahtarınızla giriş yapın</Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>Orka Finansal Takip</Text>
+        <Text style={styles.subtitle}>API anahtarınızla güvenli giriş yapın</Text>
+      </View>
 
-      <Text style={styles.inputLabel}>API Key</Text>
-      <TextInput
-        value={apiKey}
-        onChangeText={setApiKey}
-        placeholder="D-E-M-O"
-        autoCapitalize="characters"
-        autoCorrect={false}
-        style={styles.input}
-      />
+      <View style={styles.form}>
+        <Input
+          label="API Anahtarı"
+          value={apiKey}
+          onChangeText={(text) => {
+            setApiKey(text);
+            setError(null);
+          }}
+          placeholder="D-E-M-O"
+          autoCapitalize="characters"
+          autoCorrect={false}
+          error={error && !apiKey.trim() ? "API anahtarı gereklidir" : undefined}
+        />
 
-      <Text style={styles.inputLabel}>Bilanço Yılı</Text>
-      <TextInput
-        value={year}
-        onChangeText={setYear}
-        placeholder="2025"
-        keyboardType="numeric"
-        style={styles.input}
-      />
+        <Input
+          label="Bilanço Yılı"
+          value={year}
+          onChangeText={setYear}
+          placeholder="2025"
+          keyboardType="numeric"
+          helperText="Çalışmak istediğiniz bilanço yılını girin"
+        />
 
-      <TouchableOpacity disabled={loading} onPress={handleLogin} style={[styles.button, loading && styles.buttonDisabled]}>
-        <Text style={styles.buttonText}>{loading ? "Bağlanıyor..." : "Giriş Yap"}</Text>
-      </TouchableOpacity>
+        {error && (
+          <View style={styles.errorContainer}>
+            <ErrorState
+              message={error}
+              onRetry={() => setError(null)}
+              retryLabel="Tamam"
+            />
+          </View>
+        )}
+
+        <Button
+          disabled={loading}
+          loading={loading}
+          onPress={handleLogin}
+          fullWidth
+          size="lg"
+          style={styles.submitButton}
+        >
+          Giriş Yap
+        </Button>
+      </View>
     </SafeAreaView>
   );
 }
@@ -77,49 +105,31 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 120,
-    backgroundColor: "#0B1120",
+    backgroundColor: colors.dark.background,
+    paddingHorizontal: spacing.xl,
+  },
+  header: {
+    paddingTop: spacing.xxxl * 3,
+    marginBottom: spacing.xxxl,
   },
   title: {
-    color: "#FFFFFF",
-    fontSize: 28,
+    color: colors.neutral[50],
+    fontSize: fontSize.xxxl,
     fontWeight: "700",
+    marginBottom: spacing.sm,
   },
   subtitle: {
-    color: "#9BA4B5",
-    fontSize: 16,
-    marginTop: 8,
-    marginBottom: 32,
+    color: colors.neutral[400],
+    fontSize: fontSize.lg,
+    lineHeight: 24,
   },
-  inputLabel: {
-    color: "#E2E8F0",
-    fontWeight: "600",
-    marginBottom: 8,
+  form: {
+    gap: spacing.xl,
   },
-  input: {
-    backgroundColor: "#1C2233",
-    color: "#FFFFFF",
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: "#293147",
+  errorContainer: {
+    marginVertical: spacing.md,
   },
-  button: {
-    backgroundColor: colors.primary,
-    paddingVertical: 16,
-    alignItems: "center",
-    borderRadius: 12,
-    marginTop: 12,
-  },
-  buttonDisabled: {
-    opacity: 0.7,
-  },
-  buttonText: {
-    color: "#FFFFFF",
-    fontWeight: "700",
-    fontSize: 16,
+  submitButton: {
+    marginTop: spacing.md,
   },
 });

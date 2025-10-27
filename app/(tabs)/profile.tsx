@@ -1,7 +1,10 @@
-import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { SafeAreaView, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
 import { useAuth } from "@/context/AuthContext";
+import { Button, Card } from "@/components/ui";
+import { colors, spacing, fontSize } from "@/constants/theme";
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -18,28 +21,80 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.section}>
+      <View style={styles.header}>
         <Text style={styles.title}>Profil</Text>
-        <Text style={styles.subtitle}>Bağlı Kullanıcı</Text>
-        <View style={styles.infoCard}>
-          <Text style={styles.infoLabel}>Kullanıcı</Text>
-          <Text style={styles.infoValue}>{state.loginUser?.KullaniciAdi ?? "Bilinmiyor"}</Text>
+        <Text style={styles.subtitle}>Hesap bilgileriniz ve ayarlarınız</Text>
+      </View>
 
-          <Text style={[styles.infoLabel, { marginTop: 16 }]}>Firma</Text>
-          <Text style={styles.infoValue}>
-            {state.selectedCompany?.unvan1 ?? state.selectedCompany?.veritabaniadi ?? "Firma seçilmedi"}
-          </Text>
+      <View style={styles.content}>
+        <Card variant="elevated" style={styles.profileCard}>
+          <View style={styles.avatarContainer}>
+            <View style={styles.avatar}>
+              <Ionicons name="person" size={32} color={colors.primary[500]} />
+            </View>
+          </View>
+          <View style={styles.profileInfo}>
+            <Text style={styles.userName}>{state.loginUser?.KullaniciAdi ?? "Kullanıcı"}</Text>
+            <Text style={styles.userRole}>Orka Kullanıcısı</Text>
+          </View>
+        </Card>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Firma Bilgileri</Text>
+          <Card>
+            <View style={styles.infoRow}>
+              <View style={styles.infoIconContainer}>
+                <Ionicons name="business" size={20} color={colors.primary[500]} />
+              </View>
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>Aktif Firma</Text>
+                <Text style={styles.infoValue}>
+                  {state.selectedCompany?.unvan1 ?? state.selectedCompany?.veritabaniadi ?? "Firma seçilmedi"}
+                </Text>
+              </View>
+            </View>
+            {state.selectedCompany?.veritabaniadi && (
+              <View style={[styles.infoRow, { marginTop: spacing.lg }]}>
+                <View style={styles.infoIconContainer}>
+                  <Ionicons name="code-working" size={20} color={colors.primary[500]} />
+                </View>
+                <View style={styles.infoContent}>
+                  <Text style={styles.infoLabel}>Veritabanı Kodu</Text>
+                  <Text style={styles.infoValue}>{state.selectedCompany.veritabaniadi}</Text>
+                </View>
+              </View>
+            )}
+            {state.selectedCompany?.vergidairesi && (
+              <View style={[styles.infoRow, { marginTop: spacing.lg }]}>
+                <View style={styles.infoIconContainer}>
+                  <Ionicons name="document-text" size={20} color={colors.primary[500]} />
+                </View>
+                <View style={styles.infoContent}>
+                  <Text style={styles.infoLabel}>Vergi Dairesi</Text>
+                  <Text style={styles.infoValue}>{state.selectedCompany.vergidairesi}</Text>
+                </View>
+              </View>
+            )}
+          </Card>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Ayarlar</Text>
+          <Button
+            variant="outline"
+            onPress={handleSwitchCompany}
+            fullWidth
+            icon={<Ionicons name="swap-horizontal" size={20} color={colors.primary[600]} />}
+          >
+            Firma Değiştir
+          </Button>
         </View>
       </View>
 
-      <View style={styles.actions}>
-        <TouchableOpacity style={styles.secondaryButton} onPress={handleSwitchCompany}>
-          <Text style={styles.secondaryButtonText}>Firma Değiştir</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.dangerButton} onPress={handleLogout}>
-          <Text style={styles.dangerButtonText}>Çıkış yap</Text>
-        </TouchableOpacity>
+      <View style={styles.footer}>
+        <Button variant="danger" onPress={handleLogout} fullWidth icon={<Ionicons name="log-out-outline" size={20} color="#FFF" />}>
+          Çıkış Yap
+        </Button>
       </View>
     </SafeAreaView>
   );
@@ -48,63 +103,97 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0B1120",
-    padding: 20,
+    backgroundColor: colors.dark.background,
   },
-  section: {
-    gap: 16,
+  header: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.xxl,
+    paddingBottom: spacing.lg,
   },
   title: {
-    color: "#F8FAFC",
-    fontSize: 24,
+    color: colors.neutral[50],
+    fontSize: fontSize.xxl,
     fontWeight: "700",
+    marginBottom: spacing.xs,
   },
   subtitle: {
-    color: "#94A3B8",
+    color: colors.neutral[400],
+    fontSize: fontSize.md,
   },
-  infoCard: {
-    backgroundColor: "#111827",
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: "#1E293B",
+  content: {
+    flex: 1,
+    paddingHorizontal: spacing.xl,
+  },
+  profileCard: {
+    alignItems: "center",
+    paddingVertical: spacing.xxl,
+    marginBottom: spacing.xl,
+  },
+  avatarContainer: {
+    marginBottom: spacing.lg,
+  },
+  avatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: `${colors.primary[500]}20`,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  profileInfo: {
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  userName: {
+    color: colors.neutral[50],
+    fontSize: fontSize.xl,
+    fontWeight: "700",
+  },
+  userRole: {
+    color: colors.neutral[400],
+    fontSize: fontSize.md,
+  },
+  section: {
+    marginBottom: spacing.xl,
+  },
+  sectionTitle: {
+    color: colors.neutral[200],
+    fontSize: fontSize.lg,
+    fontWeight: "700",
+    marginBottom: spacing.md,
+  },
+  infoRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.md,
+  },
+  infoIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: `${colors.primary[500]}15`,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  infoContent: {
+    flex: 1,
   },
   infoLabel: {
-    color: "#94A3B8",
-    fontSize: 13,
-    fontWeight: "600",
-    textTransform: "uppercase",
+    color: colors.neutral[400],
+    fontSize: fontSize.sm,
+    marginBottom: spacing.xs / 2,
   },
   infoValue: {
-    color: "#F8FAFC",
-    fontSize: 18,
-    marginTop: 4,
+    color: colors.neutral[50],
+    fontSize: fontSize.md,
     fontWeight: "600",
   },
-  actions: {
-    marginTop: "auto",
-    gap: 12,
-  },
-  secondaryButton: {
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#2563EB",
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  secondaryButtonText: {
-    color: "#60A5FA",
-    fontWeight: "600",
-  },
-  dangerButton: {
-    borderRadius: 12,
-    backgroundColor: "#EF4444",
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  dangerButtonText: {
-    color: "#FFF",
-    fontWeight: "600",
+  footer: {
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.xl,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.dark.border,
   },
 });
 

@@ -1,6 +1,5 @@
 import { useMemo } from "react";
 import {
-  ActivityIndicator,
   RefreshControl,
   SafeAreaView,
   ScrollView,
@@ -12,6 +11,10 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { useDocumentsQuery } from "@/hooks/useOrkaQueries";
 import { buildDashboardSummary, getDocumentAmount, getDocumentDirection } from "@/utils/dashboard";
+import { MetricCard } from "@/components/dashboard/metric-card";
+import { TransactionListItem } from "@/components/dashboard/transaction-list-item";
+import { LoadingState, EmptyState } from "@/components/ui";
+import { colors, spacing, fontSize } from "@/constants/theme";
 
 export default function DashboardScreen() {
   const { state } = useAuth();
@@ -20,140 +23,145 @@ export default function DashboardScreen() {
   const summary = useMemo(() => buildDashboardSummary(data ?? []), [data]);
   const lastTransactions = useMemo(() => (data ?? []).slice(0, 5), [data]);
 
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <LoadingState message="Finansal veriler yükleniy or..." />
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl tintColor="#fff" refreshing={isRefetching} onRefresh={refetch} />}
+        refreshControl={
+          <RefreshControl
+            tintColor={colors.primary[500]}
+            refreshing={isRefetching}
+            onRefresh={refetch}
+          />
+        }
       >
-        <Text style={styles.heading}>
-          {state.selectedCompany?.unvan1 || state.selectedCompany?.veritabaniadi || "Firma seçilmedi"}
-        </Text>
-        <Text style={styles.subHeading}>Finansal Özet</Text>
-
-        <View style={styles.cardsRow}>
-          <MetricCard label="Gelir" value={summary.totalSales} />
-          <MetricCard label="Gider" value={summary.totalPurchases} />
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.heading}>
+              {state.selectedCompany?.unvan1 || state.selectedCompany?.veritabaniadi || "Firma seçilmedi"}
+            </Text>
+            <Text style={styles.subHeading}>Finansal Özetiniz</Text>
+          </View>
         </View>
 
-        <View style={styles.cardsRow}>
-          <MetricCard label="Kar" value={summary.profit} highlight />
-          <MetricCard label="İşlem" value={summary.transactionCount} isInt />
+        <View style={styles.metricsGrid}>
+          <MetricCard
+            label="Toplam Gelir"
+            value={`₺${summary.totalSales.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}`}
+            icon="trending-up"
+            variant="success"
+          />
+          <MetricCard
+            label="Toplam Gider"
+            value={`₺${summary.totalPurchases.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}`}
+            icon="trending-down"
+            variant="error"
+          />
+          <MetricCard
+            label="Net Kar"
+            value={`₺${summary.profit.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}`}
+            icon="cash"
+            variant={summary.profit >= 0 ? "success" : "error"}
+          />
+          <MetricCard
+            label="İşlem Sayısı"
+            value={summary.transactionCount.toString()}
+            icon="document-text"
+            variant="default"
+          />
         </View>
 
-        <Text style={styles.sectionTitle}>Son İşlemler</Text>
-        {isLoading ? (
-          <ActivityIndicator color="#4ADE80" />
-        ) : (
-          lastTransactions.map((transaction, index) => {
-            const amount = getDocumentAmount(transaction) ?? 0;
-            const direction = getDocumentDirection(transaction);
-            const formatted = amount.toLocaleString("tr-TR", { minimumFractionDigits: 2 });
-            const amountColor = direction === -1 ? "#4ADE80" : direction === 1 ? "#F87171" : "#E2E8F0";
-            return (
-              <View key={`${transaction?.OrkaUQ ?? index}`} style={styles.transactionCard}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.transactionTitle}>#{transaction?.STK_STOKBASLIK?.belgeno ?? "-"}</Text>
-                  <Text style={styles.transactionSub}>
-                    {transaction?.STK_STOKBASLIK?.belgeserino ?? "Belge"} ·{" "}
-                    {transaction?.STK_STOKBASLIK?.belgetarihi?.slice(0, 10) ?? "Tarih yok"}
-                  </Text>
-                </View>
-                <Text style={[styles.transactionAmount, { color: amountColor }]}>₺ {formatted}</Text>
-              </View>
-            );
-          })
-        )}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Son İşlemler</Text>
+          {lastTransactions.length === 0 ? (
+            <EmptyState
+              icon="document-text-outline"
+              title="İşlem Bulunamadı"
+              description="Henüz hiçbir işlem kaydı bulunmuyor."
+            />
+          ) : (
+            <View style={styles.transactionsList}>
+              {lastTransactions.map((transaction, index) => {
+                const amount = getDocumentAmount(transaction) ?? 0;
+                const direction = getDocumentDirection(transaction);
+                const formatted = `₺${amount.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}`;
+                const type = direction === -1 ? "income" : direction === 1 ? "expense" : "neutral";
+                const title = `#${transaction?.STK_STOKBASLIK?.belgeno ?? "-"}`;
+                const subtitle = `${transaction?.STK_STOKBASLIK?.belgeserino ?? "Belge"} · ${
+                  transaction?.STK_STOKBASLIK?.belgetarihi?.slice(0, 10) ?? "Tarih yok"
+                }`;
+
+                return (
+                  <TransactionListItem
+                    key={`${transaction?.OrkaUQ ?? index}`}
+                    title={title}
+                    subtitle={subtitle}
+                    amount={formatted}
+                    type={type}
+                    icon={direction === -1 ? "arrow-up-circle" : "arrow-down-circle"}
+                  />
+                );
+              })}
+            </View>
+          )}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-type MetricProps = {
-  label: string;
-  value: number;
-  highlight?: boolean;
-  isInt?: boolean;
-};
-
-function MetricCard({ label, value, highlight, isInt }: MetricProps) {
-  const display = isInt ? value.toString() : `${value.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} ₺`;
-  return (
-    <View style={[styles.metricCard, highlight && styles.metricCardHighlight]}>
-      <Text style={styles.metricLabel}>{label}</Text>
-      <Text style={styles.metricValue}>{display}</Text>
-    </View>
-  );
-}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0B1120",
+    backgroundColor: colors.dark.background,
   },
   content: {
-    padding: 20,
-    gap: 18,
+    paddingBottom: spacing.xl,
+  },
+  header: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.xxl,
+    paddingBottom: spacing.lg,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
   },
   heading: {
-    color: "#F8FAFC",
-    fontSize: 20,
+    color: colors.neutral[50],
+    fontSize: fontSize.xxl,
     fontWeight: "700",
+    marginBottom: spacing.xs,
   },
   subHeading: {
-    color: "#94A3B8",
+    color: colors.neutral[400],
+    fontSize: fontSize.md,
   },
-  cardsRow: {
+  metricsGrid: {
     flexDirection: "row",
-    gap: 12,
+    flexWrap: "wrap",
+    paddingHorizontal: spacing.xl,
+    gap: spacing.md,
   },
-  metricCard: {
-    flex: 1,
-    backgroundColor: "#151C2C",
-    padding: 18,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#1E293B",
-  },
-  metricCardHighlight: {
-    borderColor: "#22C55E",
-  },
-  metricLabel: {
-    color: "#94A3B8",
-    fontSize: 13,
-  },
-  metricValue: {
-    color: "#F8FAFC",
-    fontSize: 20,
-    fontWeight: "700",
-    marginTop: 8,
+  section: {
+    marginTop: spacing.xxl,
+    paddingHorizontal: spacing.xl,
   },
   sectionTitle: {
-    color: "#CBD5F5",
-    fontWeight: "600",
-    marginTop: 12,
-  },
-  transactionCard: {
-    backgroundColor: "#111827",
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#1F2937",
-    marginBottom: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  transactionTitle: {
-    color: "#E2E8F0",
-    fontWeight: "600",
-    marginBottom: 4,
-  },
-  transactionSub: {
-    color: "#94A3B8",
-  },
-  transactionAmount: {
+    color: colors.neutral[200],
+    fontSize: fontSize.lg,
     fontWeight: "700",
-    fontSize: 16,
+    marginBottom: spacing.lg,
+  },
+  transactionsList: {
+    gap: spacing.md,
   },
 });
