@@ -14,6 +14,8 @@ import { buildDashboardSummary, getDocumentAmount, getDocumentDirection } from "
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { TransactionListItem } from "@/components/dashboard/transaction-list-item";
 import { LoadingState, EmptyState } from "@/components/ui";
+import { LineChart } from "@/components/charts/line-chart";
+import { BarChart } from "@/components/charts/bar-chart";
 import { colors, spacing, fontSize } from "@/constants/theme";
 
 export default function DashboardScreen() {
@@ -22,6 +24,46 @@ export default function DashboardScreen() {
 
   const summary = useMemo(() => buildDashboardSummary(data ?? []), [data]);
   const lastTransactions = useMemo(() => (data ?? []).slice(0, 5), [data]);
+
+  const monthlyData = useMemo(() => {
+    const documents = data ?? [];
+    const monthMap = new Map<string, { income: number; expense: number }>();
+
+    documents.forEach((doc) => {
+      const date = doc?.STK_STOKBASLIK?.belgetarihi;
+      if (!date) return;
+
+      const month = date.slice(0, 7);
+      const amount = getDocumentAmount(doc) ?? 0;
+      const direction = getDocumentDirection(doc);
+
+      if (!monthMap.has(month)) {
+        monthMap.set(month, { income: 0, expense: 0 });
+      }
+
+      const monthData = monthMap.get(month)!;
+      if (direction === -1) {
+        monthData.income += amount;
+      } else if (direction === 1) {
+        monthData.expense += amount;
+      }
+    });
+
+    const sortedMonths = Array.from(monthMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-6);
+
+    return {
+      income: sortedMonths.map(([month, data]) => ({
+        x: month.slice(5),
+        y: data.income,
+      })),
+      expense: sortedMonths.map(([month, data]) => ({
+        x: month.slice(5),
+        y: data.expense,
+      })),
+    };
+  }, [data]);
 
   if (isLoading) {
     return (
@@ -78,6 +120,28 @@ export default function DashboardScreen() {
             variant="default"
           />
         </View>
+
+        {monthlyData.income.length > 0 && (
+          <View style={styles.section}>
+            <LineChart
+              data={monthlyData.income}
+              title="Aylık Gelir Trendi"
+              color={colors.success[500]}
+              height={220}
+            />
+          </View>
+        )}
+
+        {monthlyData.expense.length > 0 && (
+          <View style={styles.section}>
+            <BarChart
+              data={monthlyData.expense}
+              title="Aylık Gider Dağılımı"
+              color={colors.error[500]}
+              height={220}
+            />
+          </View>
+        )}
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Son İşlemler</Text>

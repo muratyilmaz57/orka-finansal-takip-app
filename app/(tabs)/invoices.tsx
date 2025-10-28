@@ -1,123 +1,162 @@
 import { useMemo, useState } from "react";
-import { ActivityIndicator, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 import { useDocumentsQuery } from "@/hooks/useOrkaQueries";
 import { getDocumentAmount, getDocumentDirection } from "@/utils/dashboard";
 import { formatDate } from "@/utils/format";
+import { SearchBar, FilterChip, LoadingState, EmptyState, Card } from "@/components/ui";
+import { colors, spacing, fontSize } from "@/constants/theme";
 
 type InvoiceType = "all" | "sales" | "purchase";
 
 export default function InvoicesScreen() {
   const [filter, setFilter] = useState<InvoiceType>("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const { data, isLoading, isRefetching, refetch } = useDocumentsQuery({ Page: 1 });
 
   const invoices = useMemo(() => {
-    const documents = data ?? [];
+    let documents = data ?? [];
 
-    if (filter === "all") {
-      return documents.slice(0, 10);
+    if (filter !== "all") {
+      const direction = filter === "sales" ? -1 : 1;
+      documents = documents.filter((doc) => getDocumentDirection(doc) === direction);
     }
 
-    const direction = filter === "sales" ? -1 : 1;
-    const filtered = documents.filter((doc) => getDocumentDirection(doc) === direction);
-    return filtered.slice(0, 10);
-  }, [data, filter]);
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      documents = documents.filter((doc) => {
+        const invoiceNo = (doc?.STK_STOKBASLIK?.belgeserino ?? "").toLowerCase();
+        const customerName = (doc?.STK_STOKBASLIK?.unvan ?? "").toLowerCase();
+        const belgeno = (doc?.STK_STOKBASLIK?.belgeno ?? "").toLowerCase();
+        return invoiceNo.includes(query) || customerName.includes(query) || belgeno.includes(query);
+      });
+    }
+
+    return documents;
+  }, [data, filter, searchQuery]);
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <LoadingState message="Faturalar yükleniyor..." />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>E-Belgeler</Text>
+        <Text style={styles.subtitle}>{invoices.length} fatura bulundu</Text>
+      </View>
+
       <ScrollView
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl tintColor="#fff" refreshing={isRefetching} onRefresh={refetch} />}
+        refreshControl={
+          <RefreshControl
+            tintColor={colors.primary[500]}
+            refreshing={isRefetching}
+            onRefresh={refetch}
+          />
+        }
       >
-        <Text style={styles.title}>E-Belgeler</Text>
-        <Text style={styles.subtitle}>Son 10 Fatura</Text>
-        {!isLoading && data && (
-          <Text style={styles.debugText}>
-            Toplam {data.length} belge, gösterilen {invoices.length} fatura
-          </Text>
-        )}
+        <SearchBar
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Fatura ara (no, müşteri...)"
+        />
 
         <View style={styles.filterRow}>
           {(["all", "sales", "purchase"] as InvoiceType[]).map((item) => (
-            <TouchableOpacity
+            <FilterChip
               key={item}
+              label={item === "all" ? "Tümü" : item === "sales" ? "Satış" : "Alış"}
+              selected={filter === item}
               onPress={() => setFilter(item)}
-              style={[styles.filterChip, filter === item && styles.filterChipActive]}
-            >
-              <Text style={[styles.filterText, filter === item && styles.filterTextActive]}>
-                {item === "all" ? "Tümü" : item === "sales" ? "Satış Faturası" : "Alış Faturası"}
-              </Text>
-            </TouchableOpacity>
+            />
           ))}
         </View>
 
-        {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator color="#38bdf8" size="large" />
-            <Text style={styles.loadingText}>Faturalar yükleniyor...</Text>
-          </View>
-        ) : invoices.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="document-text-outline" size={64} color="#475569" />
-            <Text style={styles.emptyText}>Fatura bulunamadı</Text>
-          </View>
+        {invoices.length === 0 ? (
+          <EmptyState
+            icon="document-text-outline"
+            title="Fatura Bulunamadı"
+            description={
+              searchQuery
+                ? "Arama kriterlerinize uygun fatura bulunamadı."
+                : "Henüz hiçbir fatura kaydı bulunmuyor."
+            }
+          />
         ) : (
-          invoices.map((doc, index) => {
-            const amount = getDocumentAmount(doc) ?? 0;
-            const direction = getDocumentDirection(doc);
-            const formatted = amount.toLocaleString("tr-TR", { minimumFractionDigits: 2 });
-            const invoiceNo = doc?.STK_STOKBASLIK?.belgeserino ?? doc?.belgeserino ?? "Belge";
-            const invoiceDate = formatDate(doc?.STK_STOKBASLIK?.belgetarihi ?? doc?.belgetarihi) ?? "Tarih yok";
-            const customerName = doc?.STK_STOKBASLIK?.unvan ?? doc?.unvan ?? "Müşteri bilgisi yok";
-            const documentType = direction === -1 ? "Satış Faturası" : direction === 1 ? "Alış Faturası" : "Belge";
-            const amountColor = direction === -1 ? "#4ADE80" : direction === 1 ? "#F87171" : "#E2E8F0";
+          <View style={styles.invoicesList}>
+            {invoices.map((doc, index) => {
+              const amount = getDocumentAmount(doc) ?? 0;
+              const direction = getDocumentDirection(doc);
+              const formatted = amount.toLocaleString("tr-TR", { minimumFractionDigits: 2 });
+              const invoiceNo = doc?.STK_STOKBASLIK?.belgeserino ?? doc?.belgeserino ?? "Belge";
+              const invoiceDate = formatDate(doc?.STK_STOKBASLIK?.belgetarihi ?? doc?.belgetarihi) ?? "Tarih yok";
+              const customerName = doc?.STK_STOKBASLIK?.unvan ?? doc?.unvan ?? "Müşteri bilgisi yok";
+              const documentType = direction === -1 ? "Satış Faturası" : direction === 1 ? "Alış Faturası" : "Belge";
+              const amountColor = direction === -1 ? colors.success[500] : direction === 1 ? colors.error[500] : colors.neutral[400];
 
-            return (
-              <View key={`${doc?.OrkaUQ ?? index}`} style={styles.invoiceCard}>
-                <View style={styles.cardHeader}>
-                  <View style={styles.cardHeaderLeft}>
-                    <Ionicons
-                      name={direction === -1 ? "arrow-up-circle" : "arrow-down-circle"}
-                      size={24}
-                      color={amountColor}
-                    />
-                    <View style={styles.cardHeaderText}>
-                      <Text style={styles.invoiceNo}>{invoiceNo}</Text>
-                      <Text style={styles.documentType}>{documentType}</Text>
+              return (
+                <TouchableOpacity
+                  key={`${doc?.OrkaUQ ?? index}`}
+                  activeOpacity={0.7}
+                >
+                  <Card variant="elevated" style={styles.invoiceCard}>
+                    <View style={styles.cardHeader}>
+                      <View style={styles.cardHeaderLeft}>
+                        <View style={[styles.iconContainer, { backgroundColor: `${amountColor}15` }]}>
+                          <Ionicons
+                            name={direction === -1 ? "arrow-up" : "arrow-down"}
+                            size={20}
+                            color={amountColor}
+                          />
+                        </View>
+                        <View style={styles.cardHeaderText}>
+                          <Text style={styles.invoiceNo}>{invoiceNo}</Text>
+                          <Text style={styles.documentType}>{documentType}</Text>
+                        </View>
+                      </View>
+                      <View style={styles.cardHeaderRight}>
+                        <Text style={[styles.amount, { color: amountColor }]}>₺{formatted}</Text>
+                      </View>
                     </View>
-                  </View>
-                  <View style={styles.cardHeaderRight}>
-                    <Text style={[styles.amount, { color: amountColor }]}>₺ {formatted}</Text>
-                  </View>
-                </View>
 
-                <View style={styles.divider} />
+                    <View style={styles.divider} />
 
-                <View style={styles.cardBody}>
-                  <View style={styles.infoRow}>
-                    <Ionicons name="person-outline" size={16} color="#94A3B8" />
-                    <Text style={styles.infoLabel}>Müşteri:</Text>
-                    <Text style={styles.infoValue}>{customerName}</Text>
-                  </View>
+                    <View style={styles.cardBody}>
+                      <View style={styles.infoRow}>
+                        <Ionicons name="person-outline" size={16} color={colors.neutral[500]} />
+                        <Text style={styles.infoLabel}>Müşteri:</Text>
+                        <Text style={styles.infoValue} numberOfLines={1}>
+                          {customerName}
+                        </Text>
+                      </View>
 
-                  <View style={styles.infoRow}>
-                    <Ionicons name="calendar-outline" size={16} color="#94A3B8" />
-                    <Text style={styles.infoLabel}>Tarih:</Text>
-                    <Text style={styles.infoValue}>{invoiceDate}</Text>
-                  </View>
+                      <View style={styles.infoRow}>
+                        <Ionicons name="calendar-outline" size={16} color={colors.neutral[500]} />
+                        <Text style={styles.infoLabel}>Tarih:</Text>
+                        <Text style={styles.infoValue}>{invoiceDate}</Text>
+                      </View>
 
-                  {doc?.STK_STOKBASLIK?.aciklama1 && (
-                    <View style={styles.infoRow}>
-                      <Ionicons name="information-circle-outline" size={16} color="#94A3B8" />
-                      <Text style={styles.infoLabel}>Açıklama:</Text>
-                      <Text style={styles.infoValue}>{doc.STK_STOKBASLIK.aciklama1}</Text>
+                      {doc?.STK_STOKBASLIK?.aciklama1 && (
+                        <View style={styles.infoRow}>
+                          <Ionicons name="information-circle-outline" size={16} color={colors.neutral[500]} />
+                          <Text style={styles.infoLabel}>Açıklama:</Text>
+                          <Text style={styles.infoValue} numberOfLines={2}>
+                            {doc.STK_STOKBASLIK.aciklama1}
+                          </Text>
+                        </View>
+                      )}
                     </View>
-                  )}
-                </View>
-              </View>
-            );
-          })
+                  </Card>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -127,89 +166,56 @@ export default function InvoicesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0B1120",
+    backgroundColor: colors.dark.background,
   },
-  content: {
-    padding: 20,
-    gap: 16,
+  header: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.xxl,
+    paddingBottom: spacing.md,
   },
   title: {
-    color: "#F8FAFC",
-    fontSize: 24,
+    color: colors.neutral[50],
+    fontSize: fontSize.xxl,
     fontWeight: "700",
+    marginBottom: spacing.xs,
   },
   subtitle: {
-    color: "#94A3B8",
-    fontSize: 14,
+    color: colors.neutral[400],
+    fontSize: fontSize.md,
   },
-  debugText: {
-    color: "#64748B",
-    fontSize: 12,
-    fontStyle: "italic",
+  content: {
+    padding: spacing.xl,
+    gap: spacing.lg,
   },
   filterRow: {
     flexDirection: "row",
-    gap: 8,
+    gap: spacing.md,
     flexWrap: "wrap",
   },
-  filterChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: "#111827",
-    borderWidth: 1,
-    borderColor: "#1f2937",
-  },
-  filterChipActive: {
-    backgroundColor: "#1d4ed8",
-    borderColor: "#2563eb",
-  },
-  filterText: {
-    color: "#94A3B8",
-    fontWeight: "600",
-    fontSize: 13,
-  },
-  filterTextActive: {
-    color: "#FFFFFF",
-  },
-  loadingContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 40,
-    gap: 12,
-  },
-  loadingText: {
-    color: "#94A3B8",
-    fontSize: 14,
-  },
-  emptyContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 60,
-    gap: 12,
-  },
-  emptyText: {
-    color: "#94A3B8",
-    fontSize: 16,
+  invoicesList: {
+    gap: spacing.md,
   },
   invoiceCard: {
-    backgroundColor: "#151C2C",
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: "#1E293B",
-    gap: 16,
+    padding: 0,
   },
   cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    padding: spacing.lg,
   },
   cardHeaderLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: spacing.md,
     flex: 1,
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
   },
   cardHeaderText: {
     flex: 1,
@@ -218,39 +224,42 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
   },
   invoiceNo: {
-    color: "#F8FAFC",
-    fontSize: 17,
+    color: colors.neutral[50],
+    fontSize: fontSize.lg,
     fontWeight: "700",
   },
   documentType: {
-    color: "#94A3B8",
-    fontSize: 13,
+    color: colors.neutral[400],
+    fontSize: fontSize.sm,
     marginTop: 2,
   },
   amount: {
-    fontSize: 18,
+    fontSize: fontSize.xl,
     fontWeight: "700",
   },
   divider: {
     height: 1,
-    backgroundColor: "#1E293B",
+    backgroundColor: colors.dark.border,
+    marginHorizontal: spacing.lg,
   },
   cardBody: {
-    gap: 12,
+    padding: spacing.lg,
+    gap: spacing.md,
   },
   infoRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: spacing.sm,
   },
   infoLabel: {
-    color: "#94A3B8",
-    fontSize: 13,
+    color: colors.neutral[400],
+    fontSize: fontSize.sm,
     fontWeight: "500",
+    width: 70,
   },
   infoValue: {
-    color: "#E2E8F0",
-    fontSize: 13,
+    color: colors.neutral[200],
+    fontSize: fontSize.sm,
     flex: 1,
   },
 });
